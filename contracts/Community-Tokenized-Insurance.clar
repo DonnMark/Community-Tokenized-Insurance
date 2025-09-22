@@ -88,6 +88,23 @@
         (ok true)
     )
 )
+(define-public (withdraw-partial-stake (withdraw-amount uint))
+    (let (
+        (caller tx-sender)
+        (member-info (unwrap! (map-get? members caller) err-not-member))
+        (current-stake (get stake-amount member-info))
+    )
+        (asserts! (get active member-info) err-not-member)
+        (asserts! (> withdraw-amount u0) err-invalid-amount)
+        (asserts! (<= withdraw-amount current-stake) err-insufficient-funds)
+        (try! (as-contract (stx-transfer? withdraw-amount tx-sender caller)))
+        (map-set members caller (merge member-info {
+            stake-amount: (- current-stake withdraw-amount)
+        }))
+        (var-set total-pool-balance (- (var-get total-pool-balance) withdraw-amount))
+        (ok true)
+    )
+)
 
 (define-public (submit-claim (amount uint) (description (string-ascii 256)))
     (let (
