@@ -1,3 +1,4 @@
+
 (define-constant contract-owner tx-sender)
 (define-constant err-owner-only (err u100))
 (define-constant err-not-member (err u101))
@@ -14,6 +15,7 @@
 (define-constant minimum-stake u1000000)
 (define-constant claim-voting-period u1440)
 (define-constant min-approval-threshold u60)
+(define-constant auto-approval-threshold u100000)
 
 (define-data-var total-pool-balance uint u0)
 (define-data-var next-claim-id uint u1)
@@ -111,6 +113,7 @@
         (caller tx-sender)
         (claim-id (var-get next-claim-id))
         (member-info (unwrap! (map-get? members caller) err-not-member))
+        (auto-approve (<= amount auto-approval-threshold))
     )
         (asserts! (get active member-info) err-not-member)
         (asserts! (> amount u0) err-invalid-amount)
@@ -123,11 +126,18 @@
             votes-for: u0,
             votes-against: u0,
             total-voters: u0,
-            processed: false,
-            approved: false
+            processed: auto-approve,
+            approved: auto-approve
         })
         (var-set next-claim-id (+ claim-id u1))
-        (ok claim-id)
+        (if auto-approve
+            (begin
+                (try! (as-contract (stx-transfer? amount tx-sender caller)))
+                (var-set total-pool-balance (- (var-get total-pool-balance) amount))
+                (ok claim-id)
+            )
+            (ok claim-id)
+        )
     )
 )
 
